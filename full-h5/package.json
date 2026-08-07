@@ -1,0 +1,17 @@
+{
+  "name": "company-heroes-h5",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/copy-data.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/copy-data.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node tests/data-integrity.mjs"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
