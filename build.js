@@ -1,0 +1,8 @@
+const fs = require('fs')
+const html = fs.readFileSync('index.html', 'utf8')
+fs.mkdirSync('dist/server', { recursive: true })
+fs.mkdirSync('dist/.openai', { recursive: true })
+fs.writeFileSync('dist/index.html', html)
+fs.writeFileSync('dist/.openai/hosting.json', JSON.stringify({ project_id: 'appgprj_6a7522bfc6dc8191abf4c0c22601c0eb' }))
+fs.writeFileSync('dist/server/index.js', `const html = ${JSON.stringify(html)}; export default { async fetch() { return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } }); } };`)
+console.log('static html and server entry ready')
