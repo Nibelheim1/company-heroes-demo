@@ -37,3 +37,12 @@ npm run build
 
 当前 PK 分数为确定性模拟分，仅用于演示交互。正式上线时应接入合规授权行情源，并继续保留非投资建议提示。
 
+## 腾讯云 CloudBase 静态托管
+
+仓库根目录的 `dist/` 已经是可直接托管的生产包，必须保留 `assets/`、`data/`、`heroes/` 和 `heroes/thumb/` 子目录。使用 CloudBase CLI 时，从仓库根目录执行：
+
+```bash
+tcb hosting deploy ./dist /ths -e YOUR_ENV_ID
+```
+
+将静态站点默认文档设置为 `index.html`，访问时使用托管域名下的 `/ths/` 路径。不要上传 `full-h5/src/styles.css` 或只上传 `index.html`。
