@@ -32,6 +32,8 @@ const result = calculate(answers, heroes)
 assert(result?.primary?.code, '个人画像没有匹配公司')
 assert(result?.top5?.length === 5, '个人画像Top5不完整')
 assert(result?.profile?.title || result?.title, '个人画像标题缺失')
+assert(/^[A-Z]{4}$/.test(result?.typeCode || ''), '四字人格代码格式错误')
+assert(result?.typeAxes?.length === 4, '四字人格代码解释缺失')
 
 const team = buildTeamProfile(heroes.slice(0, 5).map(hero => hero.code), heroes)
 assert(team?.archetype && team?.chemistry && team?.strengths && team?.blindSpot, '团队画像字段不完整')

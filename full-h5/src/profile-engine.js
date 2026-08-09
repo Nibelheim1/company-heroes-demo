@@ -433,6 +433,22 @@ const dimensionProfiles = {
   resilience: '愿意让时间参与答案',
 }
 
+// A shareable four-letter identity code inspired by personality tests, but
+// using our own operating dimensions rather than copying MBTI categories.
+const typeCodeFor = (vector) => [
+  vector.exploration >= vector.resilience ? 'E' : 'G',
+  vector.execution >= vector.collaboration ? 'D' : 'C',
+  vector.depth >= vector.userFocus ? 'F' : 'U',
+  vector.adaptability >= vector.systems ? 'A' : 'S',
+].join('')
+
+const typeAxesFor = (vector) => [
+  vector.exploration >= vector.resilience ? 'E 探索' : 'G 守成',
+  vector.execution >= vector.collaboration ? 'D 执行' : 'C 协同',
+  vector.depth >= vector.userFocus ? 'F 深度' : 'U 用户',
+  vector.adaptability >= vector.systems ? 'A 应变' : 'S 系统',
+]
+
 /** Build the post-quiz personality card from a score object or answer list. */
 export function buildQuizProfile(input = {}) {
   const scored = vectorFromInput(input)
@@ -441,6 +457,7 @@ export function buildQuizProfile(input = {}) {
     .map((id, index) => ({ ...DIMENSIONS[index], score: round(clamp(Number(vector[id]) || 50)) }))
     .sort((a, b) => b.score - a.score || dimensionIds.indexOf(a.id) - dimensionIds.indexOf(b.id))
   const archetype = archetypeFor(vector)
+  const typeCode = typeCodeFor(vector)
   const tags = tagRules.filter(([id, threshold]) => vector[id] >= threshold).map(([, , tag]) => tag)
   const fallbackTags = ['保留多种可能', '用复盘换确定性', '尊重真实取舍']
   const finalTags = [...tags, ...fallbackTags].slice(0, 5)
@@ -448,6 +465,9 @@ export function buildQuizProfile(input = {}) {
   const shareText = `我的经营人格是「${archetype.title}」：${archetype.subtitle}。${top.map((item) => item.shortLabel).join(' · ')}是我的高频关键词。`
   const profile = {
     title: archetype.title,
+    typeCode,
+    personalityCode: typeCode,
+    typeAxes: typeAxesFor(vector),
     subtitle: archetype.subtitle,
     copy: archetype.copy,
     tags: finalTags,
@@ -640,6 +660,7 @@ export function buildTeamProfile(teamInput = [], heroesInput = []) {
 
 export const buildProfile = buildTeamProfile
 export const calculateTeamProfile = buildTeamProfile
+export { typeCodeFor, typeAxesFor }
 
 export default {
   DIMENSIONS,
@@ -648,6 +669,8 @@ export default {
   normalizeHeroes,
   scoreQuiz,
   buildQuizProfile,
+  typeCodeFor,
+  typeAxesFor,
   matchCompany,
   calculate,
   defaultResult,
