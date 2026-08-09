@@ -8,7 +8,7 @@ const state = {
   heroes: [], screen: 'home', loading: true, error: '',
   answers: [], quizIndex: 0, result: null, detail: null,
   search: '', pool: '全部', archetype: '全部', visible: 40,
-  team: [], friendView: false, battleDay: 2, toast: '',
+  team: [], friendView: false, battleDay: 2, toast: '', inviteCode: new URLSearchParams(location.search).get('invite') || '',
 }
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))
@@ -19,7 +19,13 @@ const restore = () => { try { const saved = JSON.parse(localStorage.getItem(STOR
 const go = (screen, options = {}) => { Object.assign(state, options, { screen }); window.scrollTo({ top: 0, behavior: 'smooth' }); save(); render() }
 const toast = message => { state.toast = message; render(); setTimeout(() => { state.toast = ''; render() }, 1800) }
 const copyText = async text => { try { await navigator.clipboard.writeText(text); toast('分享文案已复制') } catch { window.prompt('复制这段文案', text) } }
-const share = async (title, text) => { if (navigator.share) { try { await navigator.share({ title, text, url: location.href }) } catch {} } else copyText(text) }
+const share = async (title, text, url = location.href) => { if (navigator.share) { try { await navigator.share({ title, text, url }) } catch {} } else copyText(text) }
+const shortHash = value => { let hash = 2166136261; for (const char of String(value)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619); return (hash >>> 0).toString(36).toUpperCase().padStart(6, '0').slice(-6) }
+const inviteCodeForResult = () => `HERO-${shortHash(`${state.result?.primary?.code || 'hero'}-${state.answers.join('')}`)}`
+const inviteCodeForTeam = () => `TEAM-${shortHash(`${state.team.join('-') || 'empty'}-${state.result?.primary?.code || 'hero'}`)}`
+const inviteUrl = code => `${location.origin}${location.pathname}?invite=${encodeURIComponent(code)}`
+const resultShareText = () => { const code = inviteCodeForResult(); return `我测出了「${state.result?.title || '经营人格'}」，我的同频英雄是${state.result?.primary?.name || '一位公司英雄'}。来测测你会匹配到谁：${inviteUrl(code)}（邀请码 ${code}）` }
+const teamShareText = () => { const profile = buildTeamProfile(state.team, state.heroes); const code = inviteCodeForTeam(); return `${profile.shareCopy} 邀请你来组一支 3—5 人公司英雄队：${inviteUrl(code)}（组队码 ${code}）` }
 
 const nav = () => `<nav class="bottom-nav" aria-label="主导航">
   ${[['home','发现','✦'],['heroes','群英录','◈'],['team','组队','⚔']].map(([id,label,icon]) => `<button data-action="go" data-screen="${id}" class="${state.screen===id?'active':''}"><span>${icon}</span>${label}</button>`).join('')}
@@ -41,12 +47,15 @@ function renderHome() {
   const featured = state.heroes.filter(h => ['300750','600519','688256'].includes(h.code));
   const picks = featured.length === 3 ? featured : state.heroes.slice(0,3)
   const resume = state.result ? `<button class="resume-card" data-action="go" data-screen="result"><span>继续查看</span><strong>${escapeHtml(state.result.title)}</strong><small>你的经营人格与契合英雄 →</small></button>` : ''
+  const inviteBanner = state.inviteCode ? `<div class="invite-banner"><div><span class="eyebrow dark">FRIEND INVITE</span><strong>你的朋友邀请你来测公司英雄</strong><p>完成测试后，你们可以比较谁更像自己的公司人格。</p></div><button class="btn primary" data-action="start-quiz">接住邀请，开始测试</button></div>` : ''
+  const heatHeroes = picks.map((hero, index) => `<button class="heat-row" data-action="detail" data-code="${hero.code}"><span>${index + 1}</span>${portrait(hero,'heat-avatar')}<b>${escapeHtml(hero.name)}</b><small>今日同频讨论</small></button>`).join('')
   app.innerHTML = shell(`<main>
     <header class="home-hero"><div class="noise"></div><div class="topline"><b>同花顺英雄</b><span>COMPANY HEROES · FULL H5</span></div>
       <div class="hero-stage"><div class="hero-copy"><span class="eyebrow">320 A-SHARE HEROES</span><h1>如果公司都有灵魂，<br>你会和谁并肩作战？</h1><p>16道经营抉择，找到与你做事方式最契合的公司英雄；组建3—5人战队，与朋友开启盲选PK。</p><div class="cta-row"><button class="btn primary" data-action="start-quiz">开始人格测试</button><button class="btn glass" data-action="go" data-screen="heroes">浏览群英录</button></div></div>
       <div class="featured-stack">${picks.map((h,i)=>`<button class="featured-card f${i}" data-action="detail" data-code="${h.code}">${portrait(h,'featured-image')}<span>${escapeHtml(h.name)}</span></button>`).join('')}</div></div>
     </header>
-    <section class="home-body">${resume}<div class="metrics"><div><strong>320</strong><span>位英雄</span></div><div><strong>16×3</strong><span>场景选择</span></div><div><strong>8</strong><span>人格维度</span></div><div><strong>3—5</strong><span>人盲选战队</span></div></div>
+    <section class="home-body">${inviteBanner}${resume}<div class="metrics"><div><strong>320</strong><span>位英雄</span></div><div><strong>16×3</strong><span>场景选择</span></div><div><strong>8</strong><span>人格维度</span></div><div><strong>3—5</strong><span>人盲选战队</span></div></div>
+      <div class="heat-board"><div class="section-heading"><div><span class="eyebrow dark">SOCIAL HEAT</span><h2>今天大家在讨论谁？</h2></div><span class="heat-live">LIVE</span></div><p>先选一位英雄，再把你的结果发给朋友，看你们会不会撞上同一家公司。</p><div class="heat-list">${heatHeroes}</div></div>
       <div class="section-heading"><div><span class="eyebrow dark">HEROES IN FOCUS</span><h2>先认识几位英雄</h2></div><button data-action="go" data-screen="heroes">查看全部 →</button></div>
       <div class="featured-grid">${state.heroes.slice(8,14).map(h=>heroCard(h,true)).join('')}</div>
       <div class="safety-note"><b>这是一场经营人格游戏</b><p>所有契合度与PK分数只用于内容探索，不预测收益，不提供买卖建议。</p></div>
@@ -74,7 +83,8 @@ function renderResult() {
       <div class="team-cta"><div class="team-cta-art">${portrait(h,'team-cta-image',true)}</div><div><span class="eyebrow dark">NEXT MOVE</span><h2>画像完成，组建你的英雄队</h2><p>把与你同频的英雄拉到一起，看看不同公司人格会碰撞出什么化学反应。</p></div><button class="btn primary" data-action="go" data-screen="team">用英雄组建战队</button></div>
       <div class="match-card"><span class="eyebrow dark">YOUR COMPANY HERO</span><div class="match-head"><div><h2>${escapeHtml(h.name)}</h2><p>${escapeHtml(h.resultCopy || h.mission)}</p></div><strong>${h.matchScore}<small>/100</small></strong></div><div class="match-reasons">${(h.matchReasons||[]).map(x=>`<span>✓ ${escapeHtml(x)}</span>`).join('')}</div><button class="btn dark" data-action="detail" data-code="${h.code}">查看英雄完整档案</button></div>
       <div class="top-match"><div class="section-heading"><div><span class="eyebrow dark">TOP 5 MATCH</span><h2>你的同频英雄</h2></div></div><div class="horizontal-heroes">${r.top5.map(hero=>heroCard(hero,true)).join('')}</div></div>
-      <div class="action-grid"><button class="btn soft" data-action="share-result">分享我的人格</button><button class="text-link" data-action="start-quiz">重新测试</button></div>
+      <div class="share-card"><div><span class="eyebrow dark">YOUR SHARE CARD</span><h2>把结果变成一次社交邀请</h2><p>朋友完成测试后，你们可以比较契合英雄和经营人格。</p></div><div class="share-code"><span>好友邀请码</span><strong>${inviteCodeForResult()}</strong></div><div class="share-actions"><button class="btn primary" data-action="share-result">分享我的结果</button><button class="btn soft" data-action="copy-result-invite">复制邀请文案</button></div></div>
+      <div class="action-grid"><button class="text-link" data-action="start-quiz">重新测试</button></div>
       <div class="safety-note"><b>契合度解释</b><p>契合度表示你的回答与公司经营人格文案的相似程度，不代表投资价值、收益或上涨概率。</p></div>
     </section></main>`)
 }
@@ -104,14 +114,14 @@ function renderDetail() {
 function teamMember(hero, index) { return `<button class="team-member" data-action="toggle-team" data-code="${hero.code}">${portrait(hero,'team-member-image')}<span>${index+1}</span><b>${escapeHtml(hero.name)}</b><i>×</i></button>` }
 function renderTeam() {
   const team = state.team.map(heroByCode).filter(Boolean), list = filteredHeroes().slice(0,80)
-  app.innerHTML = shell(`<main><header class="team-head"><span class="eyebrow">TEAM BUILDER · 3—5 HEROES</span><h1>组建你的公司英雄队</h1><p>不同的人格组合，会生成不同的团队化学反应、优势和盲点。</p></header><section class="team-body"><div class="team-status"><div><span>YOUR ROSTER</span><strong>${team.length}<small>/5</small></strong></div><p>${team.length<3?'至少选择3位英雄才能进入盲选大厅':team.length===5?'阵容已满，可以锁定':'还可以继续补充阵容'}</p></div><div class="selected-team">${team.length?team.map(teamMember).join(''):`<div class="empty-roster">从下面选择3—5位英雄<br><small>试着混合不同人格，画像会更有趣</small></div>`}</div><button class="btn primary lock-team" data-action="lock-team" ${team.length<3?'disabled':''}>锁定阵容 · 进入盲选大厅</button><div class="section-heading"><div><span class="eyebrow dark">SELECT HEROES</span><h2>选择队员</h2></div></div>${renderFilters()}<div class="team-pick-grid">${list.map(h=>`<button class="team-pick ${state.team.includes(h.code)?'selected':''}" data-action="toggle-team" data-code="${h.code}">${portrait(h,'team-pick-image')}<span><b>${escapeHtml(h.name)}</b><small>${escapeHtml(h.archetype)}</small></span><i>${state.team.includes(h.code)?'✓':'+'}</i></button>`).join('')}</div></section></main>`)
+  app.innerHTML = shell(`<main><header class="team-head"><span class="eyebrow">TEAM BUILDER · 3—5 HEROES</span><h1>组建你的公司英雄队</h1><p>不同的人格组合，会生成不同的团队化学反应、优势和盲点。</p></header><section class="team-body"><div class="team-status"><div><span>YOUR ROSTER</span><strong>${team.length}<small>/5</small></strong></div><p>${team.length<3?'至少选择3位英雄才能进入盲选大厅':team.length===5?'阵容已满，可以锁定':'还可以继续补充阵容'}</p></div><div class="selected-team">${team.length?team.map(teamMember).join(''):`<div class="empty-roster">从下面选择3—5位英雄<br><small>试着混合不同人格，画像会更有趣</small></div>`}</div><button class="btn primary lock-team" data-action="lock-team" ${team.length<3?'disabled':''}>锁定阵容 · 进入盲选大厅</button><div class="team-invite-card"><div><span class="eyebrow dark">TEAM INVITE</span><h2>先发给朋友，再一起选英雄</h2><p>组队码 ${inviteCodeForTeam()} · 朋友打开链接后即可开始自己的英雄测试。</p></div><button class="btn soft" data-action="copy-team-invite">复制组队邀请</button></div><div class="section-heading"><div><span class="eyebrow dark">SELECT HEROES</span><h2>选择队员</h2></div></div>${renderFilters()}<div class="team-pick-grid">${list.map(h=>`<button class="team-pick ${state.team.includes(h.code)?'selected':''}" data-action="toggle-team" data-code="${h.code}">${portrait(h,'team-pick-image')}<span><b>${escapeHtml(h.name)}</b><small>${escapeHtml(h.archetype)}</small></span><i>${state.team.includes(h.code)?'✓':'+'}</i></button>`).join('')}</div></section></main>`)
 }
 
 function rivalTeam() { return state.heroes.filter(h=>!state.team.includes(h.code)).slice(27,27+state.team.length) }
 function lobbySlot(hero, hidden=false) { return hidden?`<div class="lobby-slot hidden"><b>?</b><span>HIDDEN PICK</span></div>`:`<div class="lobby-slot">${portrait(hero,'lobby-image')}<span>${escapeHtml(hero.name)}</span><small>${escapeHtml(hero.archetype)}</small></div>` }
 function renderLobby() {
   const own = state.team.map(heroByCode).filter(Boolean)
-  app.innerHTML = shell(`<main class="lobby-screen"><header class="lobby-head"><button class="back-float" data-action="go" data-screen="team">←</button><span class="eyebrow">THE MARKET ARENA · BLIND PICK</span><h1>英雄已经就位</h1><p>开局之前，双方只能看到自己的阵容。</p></header><section class="lobby-board"><div class="team-lane blue"><div class="lane-title"><span>我的战队</span><b>READY · ${own.length}/${own.length}</b></div><div class="lobby-slots">${own.map(h=>lobbySlot(h)).join('')}</div></div><div class="versus-core"><i></i><b>VS</b><span>BLIND PICK</span></div><div class="team-lane red"><div class="lane-title"><span>好友未知阵容</span><b>HIDDEN · ${own.length}/${own.length}</b></div><div class="lobby-slots">${own.map(()=>lobbySlot(null,true)).join('')}</div></div><div class="lobby-note"><b>盲选对战</b><p>你的阵容已经锁定，邀请好友选择 3—5 位英雄后开始 PK。</p></div><button class="btn primary" data-action="start-battle">邀请好友组队PK</button></section></main>`)
+  app.innerHTML = shell(`<main class="lobby-screen"><header class="lobby-head"><button class="back-float" data-action="go" data-screen="team">←</button><span class="eyebrow">THE MARKET ARENA · BLIND PICK</span><h1>英雄已经就位</h1><p>开局之前，双方只能看到自己的阵容。</p></header><section class="lobby-board"><div class="team-lane blue"><div class="lane-title"><span>我的战队</span><b>READY · ${own.length}/${own.length}</b></div><div class="lobby-slots">${own.map(h=>lobbySlot(h)).join('')}</div></div><div class="versus-core"><i></i><b>VS</b><span>BLIND PICK</span></div><div class="team-lane red"><div class="lane-title"><span>好友未知阵容</span><b>HIDDEN · ${own.length}/${own.length}</b></div><div class="lobby-slots">${own.map(()=>lobbySlot(null,true)).join('')}</div></div><div class="lobby-note"><b>盲选对战</b><p>你的阵容已经锁定，邀请好友选择 3—5 位英雄后开始 PK。</p></div><div class="invite-strip"><span>组队码 <strong>${inviteCodeForTeam()}</strong></span><button class="btn glass" data-action="copy-team-invite">复制邀请</button></div><button class="btn primary" data-action="start-battle">邀请好友组队PK</button></section></main>`)
 }
 
 const hashScore = (code, day) => { let n = [...`${code}-${day}`].reduce((sum,c)=>sum+c.charCodeAt(0),0); return Number((((n*17)%510-220)/100).toFixed(2)) }
@@ -122,7 +132,7 @@ function battleData() {
 }
 function renderBattle() {
   const b=battleData(), d=b.days[state.battleDay]
-  app.innerHTML = shell(`<main class="battle-screen"><header class="battle-head"><button class="back-float" data-action="go" data-screen="lobby">←</button><span class="eyebrow">5-DAY CLOSING DUEL · DEMO</span><h1>${d.own>=d.rival?`D${d.day}，你的战队占据上风`:`D${d.day}，好友战队暂时领先`}</h1><p>以下为玩法演示分，不是实时行情，也不代表投资表现。</p></header><section class="battle-body"><div class="score-board"><div><span>MY TEAM</span><strong class="${d.own>=d.rival?'win':''}">${d.own>0?'+':''}${d.own}</strong></div><b>VS</b><div><span>RIVAL TEAM</span><strong class="${d.rival>d.own?'win':''}">${d.rival>0?'+':''}${d.rival}</strong></div></div><div class="day-tabs">${b.days.map((x,i)=>`<button class="${i===state.battleDay?'active':''}" data-action="battle-day" data-index="${i}"><span>D${i+1}</span><b>${x.own>0?'+':''}${x.own}</b></button>`).join('')}</div><div class="team-profile-card"><span class="eyebrow">YOUR TEAM PERSONA</span><h2>${escapeHtml(b.profile.archetype)}</h2><p>${escapeHtml(b.profile.copy)}</p><div class="chemistry"><b>化学反应 · ${b.profile.chemistryScore}</b><p>${escapeHtml(b.profile.chemistry)}</p></div><div class="profile-strengths">${b.profile.strengths.map(x=>`<span>${escapeHtml(x)}</span>`).join('')}</div><div class="blind-spot"><b>队伍盲点</b><p>${escapeHtml(b.profile.blindSpot)}</p></div><div class="team-face-row">${b.own.map(h=>portrait(h,'team-face')).join('')}</div></div><div class="action-grid"><button class="btn primary" data-action="share-team">分享战队画像</button><button class="btn soft" data-action="go" data-screen="team">重新组队</button></div><div class="safety-note"><b>PK规则说明</b><p>完整版接入合规授权行情后，可按每日收盘涨跌幅等权计算。当前页面仅用确定性模拟分展示交互。</p></div></section></main>`)
+  app.innerHTML = shell(`<main class="battle-screen"><header class="battle-head"><button class="back-float" data-action="go" data-screen="lobby">←</button><span class="eyebrow">5-DAY CLOSING DUEL · DEMO</span><h1>${d.own>=d.rival?`D${d.day}，你的战队占据上风`:`D${d.day}，好友战队暂时领先`}</h1><p>以下为玩法演示分，不是实时行情，也不代表投资表现。</p></header><section class="battle-body"><div class="score-board"><div><span>MY TEAM</span><strong class="${d.own>=d.rival?'win':''}">${d.own>0?'+':''}${d.own}</strong></div><b>VS</b><div><span>RIVAL TEAM</span><strong class="${d.rival>d.own?'win':''}">${d.rival>0?'+':''}${d.rival}</strong></div></div><div class="day-tabs">${b.days.map((x,i)=>`<button class="${i===state.battleDay?'active':''}" data-action="battle-day" data-index="${i}"><span>D${i+1}</span><b>${x.own>0?'+':''}${x.own}</b></button>`).join('')}</div><div class="team-profile-card"><span class="eyebrow">YOUR TEAM PERSONA</span><h2>${escapeHtml(b.profile.archetype)}</h2><p>${escapeHtml(b.profile.copy)}</p><div class="chemistry"><b>化学反应 · ${b.profile.chemistryScore}</b><p>${escapeHtml(b.profile.chemistry)}</p></div><div class="profile-strengths">${b.profile.strengths.map(x=>`<span>${escapeHtml(x)}</span>`).join('')}</div><div class="blind-spot"><b>队伍盲点</b><p>${escapeHtml(b.profile.blindSpot)}</p></div><div class="team-face-row">${b.own.map(h=>portrait(h,'team-face')).join('')}</div></div><div class="action-grid"><button class="btn primary" data-action="share-team">分享战队画像</button><button class="btn soft" data-action="copy-team-invite">邀请好友再来一局</button><button class="btn soft" data-action="go" data-screen="team">重新组队</button></div><div class="safety-note"><b>PK规则说明</b><p>完整版接入合规授权行情后，可按每日收盘涨跌幅等权计算。当前页面仅用确定性模拟分展示交互。</p></div></section></main>`)
 }
 
 function render() {
@@ -147,8 +157,10 @@ function handleAction(target) {
   if (action==='friend-view') { state.friendView=!state.friendView; return render() }
   if (action==='start-battle') { state.battleDay=2; return go('battle') }
   if (action==='battle-day') { state.battleDay=Number(target.dataset.index); return render() }
-  if (action==='share-result') return share('我的同花顺英雄人格',state.result.shareText)
-  if (action==='share-team') { const profile=buildTeamProfile(state.team,state.heroes); return share('我的公司英雄战队',profile.shareCopy) }
+  if (action==='share-result') { const code=inviteCodeForResult(); return share('我的同花顺英雄人格',resultShareText(),inviteUrl(code)) }
+  if (action==='copy-result-invite') return copyText(resultShareText())
+  if (action==='share-team') return share('我的公司英雄战队',teamShareText(),inviteUrl(inviteCodeForTeam()))
+  if (action==='copy-team-invite') return copyText(teamShareText())
   if (action==='reload') location.reload()
 }
 
